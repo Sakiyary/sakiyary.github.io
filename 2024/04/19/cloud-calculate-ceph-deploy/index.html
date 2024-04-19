@@ -178,7 +178,7 @@
 
 <p>运行完上述命令后，如果容器、Docker、宿主机（服务器）的网络配置均没有问题，防火墙均开放 8011 端口的话，就可以在浏览器中输入 <code>http://&lt;服务器 IP&gt;:8011</code> 访问 Ceph 的 Dashboard 了。</p>
 <p><img class="lazy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABGdBTUEAALGPC/xhBQAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAADa6r/EAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=" data-src="/image/ceph-4.png" alt="Ceph Dashboard"></p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本来以为 Docker 完成这种部署任务可以轻而易举的（就像隔壁 Flint 一样），结果一来是官方文档没有 Docker 相关，二来是互联网上经验教程屈指可数，同样没有同时与 Docker &#x2F; ceph-deploy 相关的内容，三来是本人的赛博洁癖越发严重，不想为这个小任务去装庞大的 VMWare，所以就坚定地磕磕绊绊地用 Docker 和 ceph-deploy 把 Ceph 成果部署完了。感谢 GPT4 的指导，让我少走了很多弯路！</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本来以为 Docker 完成这种部署任务可以轻而易举的（就像隔壁 Flink 一样），结果一来是官方文档没有 Docker 相关，二来是互联网上经验教程屈指可数，同样没有同时与 Docker &#x2F; ceph-deploy 相关的内容，三来是本人的赛博洁癖越发严重，不想为这个小任务去装庞大的 VMWare，所以就坚定地磕磕绊绊地用 Docker 和 ceph-deploy 把 Ceph 成果部署完了。感谢 GPT4 的指导，让我少走了很多弯路！</p>
 <p>也是因为在实践的过程中，记录下了很多重复性的命令（用来复制的，虽然后来抽象成了 <code>Dockerfile</code>），所以才突发奇想，马上建个博客，把这个过程记录下来，也算是对自己通了个宵的一个总结。</p>
 <h2 id="后日谈"><a href="#后日谈" class="headerlink" title="后日谈"></a>后日谈</h2><p>TODO: 清理所有残念……</p>
 
