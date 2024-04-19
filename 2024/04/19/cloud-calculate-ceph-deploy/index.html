@@ -1,0 +1,573 @@
+
+<!DOCTYPE html><html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="hexo-theme" content="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.27.0" theme-name="Stellar" theme-version="1.27.0">
+  
+  <meta name="generator" content="Hexo 7.2.0">
+  <meta http-equiv='x-dns-prefetch-control' content='on' />
+  
+  <meta name="renderer" content="webkit">
+  <meta name="force-rendering" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+  <meta name="HandheldFriendly" content="True" >
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#f8f8f8">
+  
+  <title>Docker 的容器内部署 Ceph 集群 - 夜黎间盛开</title>
+
+  
+    <meta name="description" content="此为南京大学 2024 年春季学期云计算课程的第二次实践内容。 实践原始要求：采用成熟、简单的 ceph-deploy 实现 Ceph 集群（nautilus版本）的部署。 在实践课开始之前，我就想动手开始做，奈何没有文档，所以提前琢磨了一下。 本文的内容主要参考了 Ceph 官方文档、只讲了一半的知乎专栏、TinyChen 的博客与 GPT4。 关于 Ceph 集群的介绍，本文不再赘述，有兴趣">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker 的容器内部署 Ceph 集群">
+<meta property="og:url" content="http://blog.sakiyary.cn/2024/04/19/cloud-calculate-ceph-deploy/index.html">
+<meta property="og:site_name" content="夜黎间盛开">
+<meta property="og:description" content="此为南京大学 2024 年春季学期云计算课程的第二次实践内容。 实践原始要求：采用成熟、简单的 ceph-deploy 实现 Ceph 集群（nautilus版本）的部署。 在实践课开始之前，我就想动手开始做，奈何没有文档，所以提前琢磨了一下。 本文的内容主要参考了 Ceph 官方文档、只讲了一半的知乎专栏、TinyChen 的博客与 GPT4。 关于 Ceph 集群的介绍，本文不再赘述，有兴趣">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://blog.sakiyary.cn/image/ceph-1.png">
+<meta property="og:image" content="http://blog.sakiyary.cn/image/ceph-2.png">
+<meta property="og:image" content="http://blog.sakiyary.cn/image/ceph-3.png">
+<meta property="og:image" content="http://blog.sakiyary.cn/image/ceph-4.png">
+<meta property="article:published_time" content="2024-04-18T22:00:00.000Z">
+<meta property="article:modified_time" content="2024-04-19T00:30:09.457Z">
+<meta property="article:author" content="Sakiyary">
+<meta property="article:tag" content="ceph部署">
+<meta property="article:tag" content="云计算">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://blog.sakiyary.cn/image/ceph-1.png">
+  
+  
+  
+  <meta name="keywords" content="ceph部署,云计算">
+
+  <!-- feed -->
+  
+
+  <link rel="stylesheet" href="/css/main.css?v=1.27.0">
+
+  
+    <link rel="shortcut icon" href="https://www.tjupt.org/bitbucket/QQ%E5%9B%BE%E7%89%87202241004024736.jpg">
+  
+
+  
+
+  
+</head>
+<body>
+
+<div class="l_body s:aa content tech" id="start" layout="post" ><aside class="l_left"><div class="leftbar-container">
+
+
+<header class="header"><div class="logo-wrap"><a class="avatar" href="/about/"><div class="bg" style="opacity:0;background-image:url(https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/rainbow64@3x.webp);"></div><img no-lazy class="avatar" src="https://www.tjupt.org/bitbucket/QQ%E5%9B%BE%E7%89%87202241004024736.jpg" onerror="javascript:this.classList.add('error');this.src='https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/image/2659360.svg';"></a><a class="title" href="/"><div class="main" ff="title">夜黎间盛开</div><div class="sub cap">Sakiyary 的小花房</div></a></div></header>
+
+<div class="nav-area">
+<div class="search-wrapper" id="search-wrapper"><form class="search-form"><a class="search-button" onclick="document.getElementById(&quot;search-input&quot;).focus();"><svg t="1705074644177" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1560" width="200" height="200"><path d="M1008.839137 935.96571L792.364903 719.491476a56.783488 56.783488 0 0 0-80.152866 0 358.53545 358.53545 0 1 1 100.857314-335.166073 362.840335 362.840335 0 0 1-3.689902 170.145468 51.248635 51.248635 0 1 0 99.217358 26.444296 462.057693 462.057693 0 1 0-158.255785 242.303546l185.930047 185.725053a51.248635 51.248635 0 0 0 72.568068 0 51.248635 51.248635 0 0 0 0-72.978056z" p-id="1561"></path><path d="M616.479587 615.969233a50.428657 50.428657 0 0 0-61.498362-5.534852 174.655348 174.655348 0 0 1-177.525271 3.484907 49.403684 49.403684 0 0 0-58.833433 6.76482l-3.074918 2.869923a49.403684 49.403684 0 0 0 8.609771 78.10292 277.767601 277.767601 0 0 0 286.992355-5.739847 49.403684 49.403684 0 0 0 8.404776-76.667958z" p-id="1562"></path></svg></a><input type="text" class="search-input" id="search-input" placeholder="站内搜索"></form><div id="search-result"></div><div class="search-no-result">没有找到内容！</div></div>
+
+
+<nav class="menu dis-select"></nav>
+</div>
+<div class="widgets">
+
+
+<widget class="widget-wrapper post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2024/04/19/cloud-calculate-ceph-deploy/"><span class="title">Docker 的容器内部署 Ceph 集群</span></a><a class="item title" href="/2024/04/19/hi/"><span class="title">hi</span></a></div></widget>
+</div>
+
+</div></aside><div class="l_main" id="main">
+
+
+
+
+
+<div class="article banner top">
+  <div class="content">
+    <div class="top bread-nav footnote"><div class="left"><div class="flex-row" id="breadcrumb"><a class="cap breadcrumb" href="/">主页</a>
+<span class="sep"></span><a class="cap breadcrumb" href="/">文章</a><span class="sep"></span><a class="cap breadcrumb-link" href="/categories/2024-spring-%E4%BA%91%E8%AE%A1%E7%AE%97/">2024-spring-云计算</a></div>
+<div class="flex-row" id="post-meta"><span class="text created">发布于：<time datetime="2024-04-18T22:00:00.000Z">2024-04-19</time></span><span class="sep updated"></span><span class="text updated">更新于：<time datetime="2024-04-19T00:30:09.457Z">2024-04-19</time></span></div></div></div>
+    
+    <div class="bottom only-title">
+      
+      <div class="text-area">
+        <h1 class="text title"><span>Docker 的容器内部署 Ceph 集群</span></h1>
+        
+      </div>
+    </div>
+    
+  </div>
+  </div><article class="md-text content"><blockquote>
+<p>此为南京大学 2024 年春季学期云计算课程的第二次实践内容。</p>
+<p>实践原始要求：采用成熟、简单的 ceph-deploy 实现 Ceph 集群（nautilus版本）的部署。</p>
+<p>在实践课开始之前，我就想动手开始做，奈何没有文档，所以提前琢磨了一下。</p>
+<p>本文的内容主要参考了 <a target="_blank" rel="noopener" href="https://docs.ceph.com/en/latest/">Ceph 官方文档</a>、<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/431438548">只讲了一半的知乎专栏</a>、<a target="_blank" rel="noopener" href="https://tinychen.com/20200410-ceph-02-ceph-deploy-deploy-ceph/">TinyChen 的博客</a>与 GPT4。</p>
+<p>关于 Ceph 集群的介绍，本文不再赘述，有兴趣的读者可以参考 <a target="_blank" rel="noopener" href="https://docs.ceph.com/en/latest/">Ceph 官方文档</a>。</p>
+</blockquote>
+<p>本文记录了 Sakiyary 在 Docker 的容器内（赛博洁癖，没事找事）部署 Ceph 集群的过程。实现了 Ceph 的节点（MON x1、MGR x1、OSD x3）与 Dashboard 的部署。</p>
+<h2 id="环境说明"><a href="#环境说明" class="headerlink" title="环境说明"></a>环境说明</h2><ul>
+<li>计算机属性：<del>软院云</del>塑料云上的某一台服务器</li>
+<li>操作系统：Ubuntu 18.04</li>
+<li>假物理内存大小：16 GB</li>
+<li>假硬盘大小：145 GB</li>
+<li>Docker 版本：20.10.21</li>
+<li>用户：root（所以命令中均没有 sudo，可自行替换本文中的 <code>/root/</code> 路径为 <code>/home/&lt;用户名&gt;/</code>）</li>
+</ul>
+<p>经完整部署后预估 Ceph 集群（Docker部署 3 个节点）所需占用的最小硬盘空间为 10 GB 左右（不含 Docker 本体，仅估计 OSD 大小与镜像大小）。</p>
+<h2 id="准备工作"><a href="#准备工作" class="headerlink" title="准备工作"></a>准备工作</h2><blockquote>
+<p>Docker 的安装、科学网络的配置等工作不在本文的讨论范围内，这里只讨论 Ceph 部署的过程。</p>
+<p>若干参考文档中均指出了 Ceph 不同节点间需要同步时钟，但由于本人这次是在 Docker 容器内部署，每个容器均调用了宿主机的时间，所以这里不需要再进行时钟同步。</p>
+</blockquote>
+<h3 id="创建虚拟逻辑卷"><a href="#创建虚拟逻辑卷" class="headerlink" title="创建虚拟逻辑卷"></a>创建虚拟逻辑卷</h3><p>但由于服务器仅有一块物理硬盘，而部署 3 个 Ceph 节点就需要 3 个 OSD，也就是三个硬盘设备（逻辑卷），所以这里需要先创建三个逻辑卷。（仅创建物理卷是不够的，Ceph 只认逻辑卷，血的教训，被网爆了很久……）</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 创建三个 Image</span></span><br><span class="line"><span class="built_in">mkdir</span> -p /root/ceph</span><br><span class="line"><span class="built_in">touch</span> /root/ceph/osd1.img</span><br><span class="line"><span class="built_in">touch</span> /root/ceph/osd2.img</span><br><span class="line"><span class="built_in">touch</span> /root/ceph/osd3.img</span><br><span class="line"></span><br><span class="line"><span class="comment"># 灌零进去 灌多少自己看着办</span></span><br><span class="line"><span class="comment"># 我每个都灌了 10 GB (1G * 10) 部署完后认为每个 OSD 只要 3 GB (1G * 3) 就够了，共 9 GB</span></span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/dev/zero of=/root/ceph/osd1.img bs=1G count=3</span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/dev/zero of=/root/ceph/osd2.img bs=1G count=3</span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/dev/zero of=/root/ceph/osd3.img bs=1G count=3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建物理卷</span></span><br><span class="line"><span class="comment"># 防止占用已有的 /dev/loop* 设备，这里从 11 开始</span></span><br><span class="line">losetup /dev/loop11 /root/ceph/osd1.img</span><br><span class="line">losetup /dev/loop12 /root/ceph/osd2.img</span><br><span class="line">losetup /dev/loop13 /root/ceph/osd3.img</span><br><span class="line">pvcreate /dev/loop11</span><br><span class="line">pvcreate /dev/loop12</span><br><span class="line">pvcreate /dev/loop13</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建卷组</span></span><br><span class="line">vgcreate ceph-vg-1 /dev/loop11</span><br><span class="line">vgcreate ceph-vg-2 /dev/loop12</span><br><span class="line">vgcreate ceph-vg-3 /dev/loop13</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建逻辑卷</span></span><br><span class="line">lvcreate -l 100%FREE -n osd-lv-1 ceph-vg-1</span><br><span class="line">lvcreate -l 100%FREE -n osd-lv-2 ceph-vg-2</span><br><span class="line">lvcreate -l 100%FREE -n osd-lv-3 ceph-vg-3</span><br></pre></td></tr></table></figure>
+
+<h3 id="配置宿主机自交的-SSH-免密登录"><a href="#配置宿主机自交的-SSH-免密登录" class="headerlink" title="配置宿主机自交的 SSH 免密登录"></a>配置宿主机自交的 SSH 免密登录</h3><p>Ceph 集群中的节点之间需要 SSH 免密登录，这里提前配置好可以省去非常多的重复操作（血的教训）。</p>
+<p>思路是让三个容器都使用同一个 <code>.ssh</code> 目录，这样就不用在每个容器中都配置一遍 SSH 了，实现全联通。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 创建 .ssh 目录</span></span><br><span class="line"><span class="built_in">mkdir</span> -p /root/.ssh</span><br><span class="line"></span><br><span class="line"><span class="comment"># 生成密钥对</span></span><br><span class="line">ssh-keygen -t rsa -f /root/.ssh/id_rsa -C <span class="string">&quot;root@se-cloud&quot;</span></span><br><span class="line"><span class="built_in">cat</span> /root/.ssh/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</span><br><span class="line"></span><br><span class="line"><span class="comment"># 更改权限</span></span><br><span class="line"><span class="built_in">chmod</span> 700 /root/.ssh</span><br><span class="line"><span class="built_in">chmod</span> 600 /root/.ssh/authorized_keys</span><br></pre></td></tr></table></figure>
+
+<h3 id="创建-Docker-网络"><a href="#创建-Docker-网络" class="headerlink" title="创建 Docker 网络"></a>创建 Docker 网络</h3><p>这里创建一个 Docker 网络，方便容器之间的通信。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 创建 Docker 网络</span></span><br><span class="line">docker network create --subnet 192.168.102.0/24  ceph-network</span><br></pre></td></tr></table></figure>
+
+<p>如果不指定 <code>--subnet</code>，Docker 会自动分配一个子网，但这个默认的子网很大概率与南大宿舍有线网网段冲突（<code>172.17.0.0/16</code>），导致服务器失联，故建议手动指定一个不冲突的子网。</p>
+<h2 id="部署-Ceph-集群"><a href="#部署-Ceph-集群" class="headerlink" title="部署 Ceph 集群"></a>部署 Ceph 集群</h2><p>经过 Sakiyary 的反复试错，反复调整，反复查资料，将几乎所有的重复步骤都整合进了 <code>Dockerfile</code> 中，这里只需要构建一个新镜像就可以避免很多重复操作。（都是血的教训……）</p>
+<h3 id="构建带有-Systemd-Ceph-的-Docker-镜像"><a href="#构建带有-Systemd-Ceph-的-Docker-镜像" class="headerlink" title="构建带有 Systemd + Ceph 的 Docker 镜像"></a>构建带有 Systemd + Ceph 的 Docker 镜像</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 拉取 CentOS 7 镜像</span></span><br><span class="line">docker pull centos:7</span><br><span class="line"><span class="comment"># 创建 Dockerfile</span></span><br><span class="line">vim /root/ceph/Dockerfile</span><br></pre></td></tr></table></figure>
+<p>这里给出我的 Dockerfile，部分内容需要自行填写，可以根据自己的需求进行修改。</p>
+<figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 相关教程都用的 CentOS，所以我不敢用其他的（老实人）</span></span><br><span class="line"><span class="keyword">FROM</span> centos:<span class="number">7</span></span><br><span class="line"><span class="keyword">ENV</span> container docker</span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装 systemd，去除不需要的文件，并使能 systemd，这是至关重要的一步！</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> (<span class="built_in">cd</span> /lib/systemd/system/sysinit.target.wants/; <span class="keyword">for</span> i <span class="keyword">in</span> *; <span class="keyword">do</span> [ <span class="variable">$i</span> == systemd-tmpfiles-setup.service ] || <span class="built_in">rm</span> -f <span class="variable">$i</span>; <span class="keyword">done</span>); \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd/system/multi-user.target.wants/*;\</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /etc/systemd/system/*.wants/*;\</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd/system/local-fs.target.wants/*; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd/system/sockets.target.wants/*udev*; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd/system/sockets.target.wants/*initctl*; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd.system/basic.target.wants/*;\</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -f /lib/systemd.system/anaconda.target.wants/*;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 设置系统代理，我这边默认科学，不然容器内连不了网，登 p.nju 太麻烦了</span></span><br><span class="line"><span class="keyword">ENV</span> HTTP_PROXY=<span class="string">&quot;http://你自己的地址:端口&quot;</span> \</span><br><span class="line">    HTTPS_PROXY=<span class="string">&quot;http://你自己的地址:端口&quot;</span> \</span><br><span class="line">    http_proxy=<span class="string">&quot;http://你自己的地址:端口&quot;</span> \</span><br><span class="line">    https_proxy=<span class="string">&quot;http://你自己的地址:端口&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加 hosts 文件项，使得容器之间可以通过主机名互相访问，网段根据刚刚创建的 Docker 网络来设置</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> <span class="built_in">echo</span> <span class="string">&quot;192.168.102.2 centos-1&quot;</span> &gt;&gt; /etc/hosts &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">echo</span> <span class="string">&quot;192.168.102.3 centos-2&quot;</span> &gt;&gt; /etc/hosts &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">echo</span> <span class="string">&quot;192.168.102.4 centos-3&quot;</span> &gt;&gt; /etc/hosts</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加 Ceph 官方源，若需要镜像源（包括常规软件源），可自行更改</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> <span class="built_in">echo</span> -e <span class="string">&quot;[Ceph]\nname=Ceph Nautilus\nbaseurl=http://download.ceph.com/rpm-nautilus/el7/\$basearch\nenabled=1\ngpgcheck=0\npriority=1&quot;</span> &gt; /etc/yum.repos.d/ceph-nautilus.repo &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">echo</span> -e <span class="string">&quot;[Ceph-noarch]\nname=Ceph Noarch\nbaseurl=http://download.ceph.com/rpm-nautilus/el7/noarch\nenabled=1\ngpgcheck=0\npriority=1&quot;</span> &gt;&gt; /etc/yum.repos.d/ceph-nautilus.repo &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">echo</span> -e <span class="string">&quot;[Ceph-source]\nname=Ceph Source\nbaseurl=http://download.ceph.com/rpm-nautilus/el7/SRPMS\nenabled=0\ngpgcheck=0\npriority=1&quot;</span> &gt;&gt; /etc/yum.repos.d/ceph-nautilus.repo</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装软件，有些软件是我为了调试装进去的</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> yum update -y &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    yum install -y vim wget openssh-clients openssh-server net-tools chrony conntrack ipset jq iptables curl sysstat libseccomp socat git python-setuptools epel-release ceph-deploy &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    yum install -y ceph-mon ceph-radosgw ceph-mds ceph-mgr ceph-osd ceph-common</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 ceph-admin 目录</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> <span class="built_in">mkdir</span> -p /root/ceph-admin</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 SSH 文件夹（其实不需要），并初始化 SSH 密钥（这个是需要的）</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> <span class="built_in">mkdir</span> -p /root/.ssh &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">chmod</span> 700 /root/.ssh &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    ssh-keygen -A</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 启用 sshd 服务，这个 sshd 甚至还是现装的</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> systemctl <span class="built_in">enable</span> sshd</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 设置 systemd 为初始进程</span></span><br><span class="line"><span class="keyword">CMD</span><span class="language-bash"> [<span class="string">&quot;/usr/sbin/init&quot;</span>]</span></span><br></pre></td></tr></table></figure>
+
+<p>编写完 <code>Dockerfile</code> 后，构建镜像。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 构建镜像，/root/ceph 为 Dockerfile 所在目录</span></span><br><span class="line">docker build -t centos-ceph:7 /root/ceph</span><br></pre></td></tr></table></figure>
+
+<p>等待漫长的构建过程结束后，我们就可以使用这个镜像来创建容器了。如果你的网络不好的话，很可能会在构建时卡死在更新软件源&#x2F;安装软件那几步。</p>
+<p>构建完的镜像可以通过 <code>docker images</code> 查看，大小约为 1.01 GB。</p>
+<h3 id="创建-Ceph-容器"><a href="#创建-Ceph-容器" class="headerlink" title="创建 Ceph 容器"></a>创建 Ceph 容器</h3><p>这里使用 <code>docker-compose</code> 来运行容器会更加好。我这里就偷懒了，复制了三条 <code>docker run</code> 命令完事，不过记得要按顺序输入，也不建议更改容器的主机名称 <code>hostname</code> ，Ceph 要求主机名与域名相同，域名已在 <code>Dockerfile</code> 中设置。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line">docker run \</span><br><span class="line">  -d \</span><br><span class="line">  --privileged \</span><br><span class="line">  --name centos-1 \</span><br><span class="line">  --hostname centos-1 \</span><br><span class="line">  --network ceph-network \</span><br><span class="line">  -p 8011:8011 \</span><br><span class="line">  --device /dev/ceph-vg-1/osd-lv-1:/dev/ceph-vg-1/osd-lv-1 \</span><br><span class="line">  -v /sys/fs/cgroup:/sys/fs/cgroup:ro \</span><br><span class="line">  -v /dev:/dev \</span><br><span class="line">  -v /root/.ssh:/root/.ssh \</span><br><span class="line">  centos-ceph:8</span><br><span class="line"></span><br><span class="line"><span class="comment"># 下同，复制粘贴改变量</span></span><br><span class="line">docker run -d --privileged --name centos-2 --hostname centos-2 --network ceph-network -p 8012:8012 --device /dev/ceph-vg-2/osd-lv-2:/dev/ceph-vg-2/osd-lv-2 -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /dev:/dev -v /root/.ssh:/root/.ssh centos-ceph:8</span><br><span class="line">docker run -d --privileged --name centos-3 --hostname centos-3 --network ceph-network -p 8013:8013 --device /dev/ceph-vg-3/osd-lv-3:/dev/ceph-vg-3/osd-lv-3 -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /dev:/dev -v /root/.ssh:/root/.ssh centos-ceph:8</span><br></pre></td></tr></table></figure>
+
+<p>如果读不懂这几行运行容器的命令也很正常，因为这里的所有参数都是我每摔倒一次、去问一下 GPT4、再加上去的，诸如端口映射、设备映射、挂载目录、Systemd 的启动等等，读不懂但是好奇的也可以去问问 GPT。</p>
+<h3 id="部署-Ceph-集群-1"><a href="#部署-Ceph-集群-1" class="headerlink" title="部署 Ceph 集群"></a>部署 Ceph 集群</h3><h4 id="进入容器"><a href="#进入容器" class="headerlink" title="进入容器"></a>进入容器</h4><p>在创建完三个容器之后，最简单的就是开三个终端，分屏操作，Windows 11 的三页分屏就很爽。</p>
+<p>在三个终端分别输入下面三条命令进入容器内。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在宿主机的 root 用户下</span></span><br><span class="line"><span class="comment"># 第一个终端</span></span><br><span class="line">docker <span class="built_in">exec</span> -it centos-1 /bin/bash</span><br><span class="line"><span class="comment"># 第二个终端</span></span><br><span class="line">docker <span class="built_in">exec</span> -it centos-2 /bin/bash</span><br><span class="line"><span class="comment"># 第三个终端</span></span><br><span class="line">docker <span class="built_in">exec</span> -it centos-3 /bin/bash</span><br></pre></td></tr></table></figure>
+<p><img class="lazy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABGdBTUEAALGPC/xhBQAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAADa6r/EAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=" data-src="/image/ceph-1.png" alt="三页分屏"></p>
+<h4 id="测试网络与-SSH"><a href="#测试网络与-SSH" class="headerlink" title="测试网络与 SSH"></a>测试网络与 SSH</h4><p>分别进入容器后，可以先测试一下Docker 内部网络与 SSH 互联是否正常。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line">ping centos-2</span><br><span class="line">ping centos-3</span><br><span class="line">ssh root@centos-2</span><br><span class="line"><span class="comment"># 若正常，则应输入 yes，成功进入后输入 exit 退出</span></span><br><span class="line">ssh root@centos-3</span><br><span class="line"><span class="comment"># 若正常，则应输入 yes，成功进入后输入 exit 退出</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="部署-MON-与-MGR"><a href="#部署-MON-与-MGR" class="headerlink" title="部署 MON 与 MGR"></a>部署 MON 与 MGR</h4><p>接下来就是部署 Ceph 集群了，这里只需要在一个容器内执行即可。我选择在 <code>centos-1</code> 容器内执行。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 进入预先创建的 ceph-admin 目录</span></span><br><span class="line"><span class="built_in">cd</span> ~/ceph-admin</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化 Ceph 集群</span></span><br><span class="line">ceph-deploy new --cluster-network 192.168.102.0/24 --public-network 192.168.102.0/24 centos-1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建初始 Monitor 节点</span></span><br><span class="line">ceph-deploy mon create-initial</span><br><span class="line"><span class="comment"># 可能出现诸多异常</span></span><br><span class="line"><span class="comment"># 可参考本文的参考文档对照解决</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 将 admin 配置文件部署到所有节点</span></span><br><span class="line">ceph-deploy admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 另一个参考文档中使用了这句的参数，本人没有实验，一并输入了，不产生额外影响</span></span><br><span class="line">ceph-deploy --overwrite-conf admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 Manager 节点</span></span><br><span class="line">ceph-deploy mgr create centos-1</span><br></pre></td></tr></table></figure>
+
+<p>成功创建完 MON 节点与 MGR 节点后，就可以在另外两个容器中查看 Ceph 集群的状态了。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-2/3 内</span></span><br><span class="line">ceph health</span><br><span class="line">ceph -s</span><br></pre></td></tr></table></figure>
+
+<p>若显示如下，则说明 Ceph 集群的 MON 节点与 MGR 节点部署成功。打码部分为下一小节的内容。</p>
+<p><img class="lazy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABGdBTUEAALGPC/xhBQAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAADa6r/EAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=" data-src="/image/ceph-2.png" alt="Ceph 集群状态 MON&amp;MGR"></p>
+<p><code>HEALTH_WARN</code> 不影响正常使用，可以忽略，也可在 <code>centos-1</code> 容器内执行如下指令解决。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 禁用不安全的全局 ID 回收</span></span><br><span class="line">ceph config <span class="built_in">set</span> mon auth_allow_insecure_global_id_reclaim <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="部署-OSD"><a href="#部署-OSD" class="headerlink" title="部署 OSD"></a>部署 OSD</h4><p>接下来就是部署 OSD 了，这里也只需要在一个容器内执行即可。我选择在 <code>centos-1</code> 容器内执行。这一步折磨了我非常久，最终在 GPT4 的指导下将准备工作中的物理卷转为逻辑卷后才成功。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 创建 OSD，挂载逻辑卷</span></span><br><span class="line">ceph-deploy osd create --data /dev/ceph-vg-1/osd-lv-1 centos-1</span><br><span class="line">ceph-deploy osd create --data /dev/ceph-vg-2/osd-lv-2 centos-2</span><br><span class="line">ceph-deploy osd create --data /dev/ceph-vg-3/osd-lv-3 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看 OSD 信息</span></span><br><span class="line">ceph osd tree</span><br></pre></td></tr></table></figure>
+
+<p>同理，成功创建完 OSD 后，就可以在另外两个容器中查看 Ceph 集群的完整状态了。</p>
+<p><img class="lazy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABGdBTUEAALGPC/xhBQAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAADa6r/EAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=" data-src="/image/ceph-3.png" alt="Ceph 集群状态 OSD"></p>
+<p>注意到，仅搭建 Ceph 集群而不使用的话，每个 OSD 的大小可以适当缩小，这里我每个 OSD 都是 10 GB，实际上只需要 2 GB 就够了，3 GB 较为保险，故 OSD 总共只需要 9 GB 的硬盘空间来保证实践的顺利进行。</p>
+<h2 id="部署-Ceph-Dashboard"><a href="#部署-Ceph-Dashboard" class="headerlink" title="部署 Ceph Dashboard"></a>部署 Ceph Dashboard</h2><p>Ceph Dashboard 是 Ceph 集群的 Web 管理界面，可以通过浏览器访问，方便地查看集群的状态、监控集群的运行情况、管理集群的配置等。</p>
+<p>Dashboard 只需要在一个节点上部署即可，这里我选择在 <code>centos-1</code> 容器内部署。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 安装 Dashboard</span></span><br><span class="line">yum install -y ceph-mgr-dashboard</span><br><span class="line"></span><br><span class="line"><span class="comment"># 启用 Dashboard</span></span><br><span class="line">ceph mgr module <span class="built_in">enable</span> dashboard</span><br><span class="line"></span><br><span class="line"><span class="comment"># 配置 Dashboard 的 SSL、IP 和端口</span></span><br><span class="line">ceph config <span class="built_in">set</span> mgr mgr/dashboard/ssl <span class="literal">false</span></span><br><span class="line">ceph config <span class="built_in">set</span> mgr mgr/dashboard/server_addr 0.0.0.0</span><br><span class="line"><span class="comment"># 注意到，在运行容器时，centos-1 容器映射了 8011 端口出去，所以这里使用 8011 端口</span></span><br><span class="line">ceph config <span class="built_in">set</span> mgr mgr/dashboard/server_port 8011</span><br><span class="line">ceph config <span class="built_in">set</span> mgr mgr/dashboard/ssl_server_port 8011</span><br><span class="line"></span><br><span class="line"><span class="comment"># 重启 Dashboard 服务以使配置生效</span></span><br><span class="line">ceph mgr module <span class="built_in">disable</span> dashboard</span><br><span class="line">ceph mgr module <span class="built_in">enable</span> dashboard</span><br><span class="line"></span><br><span class="line"><span class="comment"># 配置 Dashboard 用户</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;admin&quot;</span> &gt; /tmp/pwd.txt</span><br><span class="line"><span class="comment"># 账密均为 admin</span></span><br><span class="line">ceph dashboard ac-user-create admin -i /tmp/pwd.txt administrator</span><br><span class="line"><span class="built_in">rm</span> /tmp/admin-password.txt</span><br><span class="line"><span class="comment"># 测试 Dashboard 登录</span></span><br><span class="line">ceph dashboard ac-user-show admin</span><br></pre></td></tr></table></figure>
+
+<p>运行完上述命令后，如果容器、Docker、宿主机（服务器）的网络配置均没有问题，防火墙均开放 8011 端口的话，就可以在浏览器中输入 <code>http://&lt;服务器 IP&gt;:8011</code> 访问 Ceph 的 Dashboard 了。</p>
+<p><img class="lazy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABGdBTUEAALGPC/xhBQAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAADa6r/EAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=" data-src="/image/ceph-4.png" alt="Ceph Dashboard"></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本来以为 Docker 完成这种部署任务可以轻而易举的（就像隔壁 Flint 一样），结果一来是官方文档没有 Docker 相关，二来是互联网上经验教程屈指可数，同样没有 Docker 相关，三来是本人的赛博洁癖越发严重，不想为这个小任务去装庞大的 VMWare，所以就坚定地磕磕绊绊地用 Docker 把 Ceph 成果部署完了。感谢 GPT4 的指导，让我少走了很多弯路！</p>
+<p>也是因为在实践的过程中，记录下了很多重复性的命令（用来复制的，虽然后来抽象成了 <code>Dockerfile</code>），所以才突发奇想，马上建个博客，把这个过程记录下来，也算是对自己通了个宵的一个总结。</p>
+
+<div class="article-footer fs14">
+    <section id="license">
+      <div class="header"><span>许可协议</span></div>
+      <div class="body"><p>本文采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">署名-非商业性使用-相同方式共享 4.0 国际</a> 许可协议，转载请注明出处。</p>
+</div>
+    </section>
+    </div>
+</article>
+<div class="related-wrap" id="read-next"><section class="body"><div class="item" id="prev"></div><div class="item" id="next"><div class="note">较早文章</div><a href="/2024/04/19/hi/">hi</a></div></section></div>
+
+
+
+
+
+
+<footer class="page-footer footnote"><hr><div class="text"><p>本站由 <a href="/">Sakiyary</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.27.0">Stellar 1.27.0</a> 主题创建。<br>本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议，转载请注明出处。</p>
+</div></footer>
+<div class="main-mask" onclick="sidebar.dismiss()"></div></div><aside class="l_right">
+<div class="widgets">
+
+
+
+<widget class="widget-wrapper toc" id="data-toc" collapse="false"><div class="widget-header dis-select"><span class="name">本文目录</span><a class="cap-action" onclick="sidebar.toggleTOC()" ><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></a></div><div class="widget-body"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E"><span class="toc-text">环境说明</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%86%E5%A4%87%E5%B7%A5%E4%BD%9C"><span class="toc-text">准备工作</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA%E8%99%9A%E6%8B%9F%E9%80%BB%E8%BE%91%E5%8D%B7"><span class="toc-text">创建虚拟逻辑卷</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%85%8D%E7%BD%AE%E5%AE%BF%E4%B8%BB%E6%9C%BA%E8%87%AA%E4%BA%A4%E7%9A%84-SSH-%E5%85%8D%E5%AF%86%E7%99%BB%E5%BD%95"><span class="toc-text">配置宿主机自交的 SSH 免密登录</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA-Docker-%E7%BD%91%E7%BB%9C"><span class="toc-text">创建 Docker 网络</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%83%A8%E7%BD%B2-Ceph-%E9%9B%86%E7%BE%A4"><span class="toc-text">部署 Ceph 集群</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9E%84%E5%BB%BA%E5%B8%A6%E6%9C%89-Systemd-Ceph-%E7%9A%84-Docker-%E9%95%9C%E5%83%8F"><span class="toc-text">构建带有 Systemd + Ceph 的 Docker 镜像</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA-Ceph-%E5%AE%B9%E5%99%A8"><span class="toc-text">创建 Ceph 容器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%83%A8%E7%BD%B2-Ceph-%E9%9B%86%E7%BE%A4-1"><span class="toc-text">部署 Ceph 集群</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E8%BF%9B%E5%85%A5%E5%AE%B9%E5%99%A8"><span class="toc-text">进入容器</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%B5%8B%E8%AF%95%E7%BD%91%E7%BB%9C%E4%B8%8E-SSH"><span class="toc-text">测试网络与 SSH</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%83%A8%E7%BD%B2-MON-%E4%B8%8E-MGR"><span class="toc-text">部署 MON 与 MGR</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%83%A8%E7%BD%B2-OSD"><span class="toc-text">部署 OSD</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%83%A8%E7%BD%B2-Ceph-Dashboard"><span class="toc-text">部署 Ceph Dashboard</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-text">总结</span></a></li></ol></div><div class="widget-footer">
+
+<a class="top" onclick="util.scrollTop()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12c0-4.714 0-7.071 1.464-8.536C4.93 2 7.286 2 12 2c4.714 0 7.071 0 8.535 1.464C22 4.93 22 7.286 22 12c0 4.714 0 7.071-1.465 8.535C19.072 22 16.714 22 12 22s-7.071 0-8.536-1.465C2 19.072 2 16.714 2 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="m9 15.5l3-3l3 3m-6-4l3-3l3 3"/></g></svg><span>回到顶部</span></a></div></widget>
+</div></aside><div class='float-panel blur'>
+  <button type='button' style='display:none' class='laptop-only rightbar-toggle mobile' onclick='sidebar.rightbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+  </button>
+  <button type='button' style='display:none' class='mobile-only leftbar-toggle mobile' onclick='sidebar.leftbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11c0-3.771 0-5.657 1.172-6.828C4.343 3 6.229 3 10 3h4c3.771 0 5.657 0 6.828 1.172C22 5.343 22 7.229 22 11v2c0 3.771 0 5.657-1.172 6.828C19.657 21 17.771 21 14 21h-4c-3.771 0-5.657 0-6.828-1.172C2 18.657 2 16.771 2 13z"/><path id="sep" stroke-linecap="round" d="M5.5 10h6m-5 4h4m4.5 7V3"/></g></svg>
+  </button>
+</div>
+</div><div class="scripts">
+<script type="text/javascript">
+  const ctx = {
+    date_suffix: {
+      just: `刚刚`,
+      min: `分钟前`,
+      hour: `小时前`,
+      day: `天前`,
+    },
+    root : `/`,
+  };
+
+  // required plugins (only load if needs)
+  if (`local_search`) {
+    ctx.search = {};
+    ctx.search.service = `local_search`;
+    if (ctx.search.service == 'local_search') {
+      let service_obj = Object.assign({}, `{"field":"all","path":"/search.json","content":true,"sort":"-date"}`);
+      ctx.search[ctx.search.service] = service_obj;
+    }
+  }
+  const def = {
+    avatar: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/3442075.svg`,
+    cover: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/cover/76b86c0226ffd.svg`,
+  };
+  const deps = {
+    jquery: `https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.min.js`,
+    marked: `https://cdn.bootcdn.net/ajax/libs/marked/4.0.18/marked.min.js`
+  }
+  
+
+</script>
+
+<script type="text/javascript">
+  const utils = {
+    // 懒加载 css https://github.com/filamentgroup/loadCSS
+    css: (href, before, media, attributes) => {
+      var doc = window.document;
+      var ss = doc.createElement("link");
+      var ref;
+      if (before) {
+        ref = before;
+      } else {
+        var refs = (doc.body || doc.getElementsByTagName("head")[0]).childNodes;
+        ref = refs[refs.length - 1];
+      }
+      var sheets = doc.styleSheets;
+      if (attributes) {
+        for (var attributeName in attributes) {
+          if (attributes.hasOwnProperty(attributeName)) {
+            ss.setAttribute(attributeName, attributes[attributeName]);
+          }
+        }
+      }
+      ss.rel = "stylesheet";
+      ss.href = href;
+      ss.media = "only x";
+      function ready(cb) {
+        if (doc.body) {
+          return cb();
+        }
+        setTimeout(function () {
+          ready(cb);
+        });
+      }
+      ready(function () {
+        ref.parentNode.insertBefore(ss, before ? ref : ref.nextSibling);
+      });
+      var onloadcssdefined = function (cb) {
+        var resolvedHref = ss.href;
+        var i = sheets.length;
+        while (i--) {
+          if (sheets[i].href === resolvedHref) {
+            return cb();
+          }
+        }
+        setTimeout(function () {
+          onloadcssdefined(cb);
+        });
+      };
+      function loadCB() {
+        if (ss.addEventListener) {
+          ss.removeEventListener("load", loadCB);
+        }
+        ss.media = media || "all";
+      }
+      if (ss.addEventListener) {
+        ss.addEventListener("load", loadCB);
+      }
+      ss.onloadcssdefined = onloadcssdefined;
+      onloadcssdefined(loadCB);
+      return ss;
+    },
+
+    js: (src, opt) => new Promise((resolve, reject) => {
+      var script = document.createElement('script');
+      if (src.startsWith('/')){
+        src = ctx.root + src.substring(1);
+      }
+      script.src = src;
+      if (opt) {
+        for (let key of Object.keys(opt)) {
+          script[key] = opt[key]
+        }
+      } else {
+        // 默认异步，如果需要同步，第二个参数传入 {} 即可
+        script.async = true
+      }
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function() {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    }),
+
+    jq: (fn) => {
+      if (typeof jQuery === 'undefined') {
+        utils.js(deps.jquery).then(fn)
+      } else {
+        fn()
+      }
+    },
+    
+    onLoading: (el) => {
+      if (el) {
+        $(el).append('<div class="loading-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" stroke-opacity=".3" d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="1.3s" values="60;0"/></path><path stroke-dasharray="15" stroke-dashoffset="15" d="M12 3C16.9706 3 21 7.02944 21 12"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.3s" values="15;0"/><animateTransform attributeName="transform" dur="1.5s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></g></svg></div>');
+      }
+    },
+    onLoadSuccess: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap').remove();
+      }
+    },
+    onLoadFailure: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap svg').remove();
+        $(el).find('.loading-wrap').append('<svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" d="M12 3L21 20H3L12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="60;0"/></path><path stroke-dasharray="6" stroke-dashoffset="6" d="M12 10V14"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="6;0"/></path></g><circle cx="12" cy="17" r="1" fill="currentColor" fill-opacity="0"><animate fill="freeze" attributeName="fill-opacity" begin="0.8s" dur="0.4s" values="0;1"/></circle></svg>');
+        $(el).find('.loading-wrap').addClass('error');
+      }
+    },
+    request: (el, url, callback, onFailure) => {
+      let retryTimes = 3;
+      utils.onLoading(el);
+      function req() {
+        return new Promise((resolve, reject) => {
+          let status = 0; // 0 等待 1 完成 2 超时
+          let timer = setTimeout(() => {
+            if (status === 0) {
+              status = 2;
+              timer = null;
+              reject('请求超时');
+              if (retryTimes == 0) {
+                onFailure();
+              }
+            }
+          }, 5000);
+          fetch(url).then(function(response) {
+            if (status !== 2) {
+              clearTimeout(timer);
+              resolve(response);
+              timer = null;
+              status = 1;
+            }
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('Network response was not ok.');
+          }).then(function(data) {
+            retryTimes = 0;
+            utils.onLoadSuccess(el);
+            callback(data);
+          }).catch(function(error) {
+            if (retryTimes > 0) {
+              retryTimes -= 1;
+              setTimeout(() => {
+                req();
+              }, 5000);
+            } else {
+              utils.onLoadFailure(el);
+              onFailure();
+            }
+          });
+        });
+      }
+      req();
+    },
+  };
+</script>
+
+<script>
+  const sidebar = {
+    leftbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    rightbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('rightbar');
+        l_body.removeAttribute('leftbar');
+      }
+    },
+    dismiss: () => {
+      if (l_body) {
+        l_body.removeAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    toggleTOC: () => {
+      document.querySelector('#data-toc').classList.toggle('collapse');
+    }
+  }
+</script>
+
+<!-- required -->
+<script src="/js/main.js?v=1.27.0" async></script>
+
+<!-- optional -->
+
+
+
+<script defer>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.services = Object.assign({}, JSON.parse(`{"mdrender":{"js":"/js/services/mdrender.js"},"siteinfo":{"js":"/js/services/siteinfo.js","api":null},"ghinfo":{"js":"/js/services/ghinfo.js"},"sites":{"js":"/js/services/sites.js"},"friends":{"js":"/js/services/friends.js"},"timeline":{"js":"/js/services/timeline.js"},"fcircle":{"js":"/js/services/fcircle.js"},"weibo":{"js":"/js/services/weibo.js"},"memos":{"js":"/js/services/memos.js"}}`));
+    for (let id of Object.keys(ctx.services)) {
+      const js = ctx.services[id].js;
+      if (id == 'siteinfo') {
+        ctx.cardlinks = document.querySelectorAll('a.link-card[cardlink]');
+        if (ctx.cardlinks?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            setCardLink(ctx.cardlinks);
+          });
+        }
+      } else {
+        const els = document.getElementsByClassName(`ds-${id}`);
+        if (els?.length > 0) {
+          utils.jq(() => {
+            if (id == 'timeline' || 'memos' || 'marked') {
+              utils.js(deps.marked).then(function () {
+                utils.js(js, { defer: true });
+              });
+            } else {
+              utils.js(js, { defer: true });
+            }
+          });
+        }
+      }
+    }
+  });
+</script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.search = {
+      path: `/search.json`,
+    }
+    utils.js('/js/search/local-search.js', { defer: true });
+  });
+</script><script>
+  window.FPConfig = {
+    delay: 0,
+    ignoreKeywords: [],
+    maxRPS: 5,
+    hoverDelay: 25
+  };
+</script>
+<script defer src="https://cdn.bootcdn.net/ajax/libs/flying-pages/2.1.2/flying-pages.min.js"></script><script defer src="https://cdn.bootcdn.net/ajax/libs/vanilla-lazyload/17.8.4/lazyload.min.js"></script>
+<script>
+  // https://www.npmjs.com/package/vanilla-lazyload
+  // Set the options globally
+  // to make LazyLoad self-initialize
+  window.lazyLoadOptions = {
+    elements_selector: ".lazy",
+  };
+  // Listen to the initialization event
+  // and get the instance of LazyLoad
+  window.addEventListener(
+    "LazyLoad::Initialized",
+    function (event) {
+      window.lazyLoadInstance = event.detail.instance;
+    },
+    false
+  );
+  document.addEventListener('DOMContentLoaded', function () {
+    window.lazyLoadInstance?.update();
+  });
+</script><script>
+  ctx.fancybox = {
+    selector: `.timenode p>img`,
+    css: `https://cdn.bootcdn.net/ajax/libs/fancyapps-ui/5.0.22/fancybox/fancybox.min.css`,
+    js: `https://cdn.bootcdn.net/ajax/libs/fancyapps-ui/5.0.22/fancybox/fancybox.umd.min.js`
+  };
+  var selector = '[data-fancybox]:not(.error)';
+  if (ctx.fancybox.selector) {
+    selector += `, ${ctx.fancybox.selector}`
+  }
+  var needFancybox = document.querySelectorAll(selector).length !== 0;
+  if (!needFancybox) {
+    const els = document.getElementsByClassName('ds-memos');
+    if (els != undefined && els.length > 0) {
+      needFancybox = true;
+    }
+  }
+  if (needFancybox) {
+    utils.css(ctx.fancybox.css);
+    utils.js(ctx.fancybox.js, { defer: true }).then(function () {
+      Fancybox.bind(selector, {
+        hideScrollbar: false,
+        Thumbs: {
+          autoStart: false,
+        },
+        caption: (fancybox, slide) => {
+          return slide.triggerEl.alt || null
+        }
+      });
+    })
+  }
+</script><script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const swiper_api = document.getElementById('swiper-api');
+    if (swiper_api != undefined) {
+      utils.css(`https://unpkg.com/swiper@10.3.1/swiper-bundle.min.css`);
+      utils.js(`https://unpkg.com/swiper@10.3.1/swiper-bundle.min.js`, { defer: true }).then(function () {
+        const effect = swiper_api.getAttribute('effect') || '';
+        var swiper = new Swiper('.swiper#swiper-api', {
+          slidesPerView: 'auto',
+          spaceBetween: 8,
+          centeredSlides: true,
+          effect: effect,
+          loop: true,
+          pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+          },
+          navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+          },
+        });
+      })
+    }
+  });
+</script><script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.codeElements = document.querySelectorAll('.code');
+    if (window.codeElements.length > 0) {
+      ctx.copycode = {
+        default_text: `Copy`,
+        success_text: `Copied`,
+        toast: `复制成功`,
+      };
+      utils.js('/js/plugins/copycode.js');
+    }
+  });
+</script>
+
+
+<!-- inject -->
+
+</div></body></html>
