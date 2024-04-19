@@ -16,12 +16,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#f8f8f8">
   
-  <title>Docker 的容器内部署 Ceph 集群 - 夜黎间盛开</title>
+  <title>Docker 容器内部署 Ceph 集群 - 夜黎间盛开</title>
 
   
     <meta name="description" content="此为南京大学 2024 年春季学期云计算课程的第二次实践内容。 实践原始要求：采用成熟、简单的 ceph-deploy 实现 Ceph 集群（nautilus版本）的部署。 在实践课开始之前，我就想动手开始做，奈何没有文档，所以提前琢磨了一下。 本文的内容主要参考了 Ceph 官方文档、只讲了一半的知乎专栏、TinyChen 的博客与 GPT4。 关于 Ceph 集群的介绍，本文不再赘述，有兴趣">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Docker 的容器内部署 Ceph 集群">
+<meta property="og:title" content="Docker 容器内部署 Ceph 集群">
 <meta property="og:url" content="http://blog.sakiyary.cn/2024/04/19/cloud-calculate-ceph-deploy/index.html">
 <meta property="og:site_name" content="夜黎间盛开">
 <meta property="og:description" content="此为南京大学 2024 年春季学期云计算课程的第二次实践内容。 实践原始要求：采用成熟、简单的 ceph-deploy 实现 Ceph 集群（nautilus版本）的部署。 在实践课开始之前，我就想动手开始做，奈何没有文档，所以提前琢磨了一下。 本文的内容主要参考了 Ceph 官方文档、只讲了一半的知乎专栏、TinyChen 的博客与 GPT4。 关于 Ceph 集群的介绍，本文不再赘述，有兴趣">
@@ -71,7 +71,7 @@
 <div class="widgets">
 
 
-<widget class="widget-wrapper post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2024/04/19/cloud-calculate-ceph-deploy/"><span class="title">Docker 的容器内部署 Ceph 集群</span></a><a class="item title" href="/2024/04/19/hi/"><span class="title">hi</span></a></div></widget>
+<widget class="widget-wrapper post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2024/04/19/cloud-calculate-ceph-deploy/"><span class="title">Docker 容器内部署 Ceph 集群</span></a><a class="item title" href="/2024/04/19/hi/"><span class="title">hi</span></a></div></widget>
 </div>
 
 </div></aside><div class="l_main" id="main">
@@ -89,7 +89,7 @@
     <div class="bottom only-title">
       
       <div class="text-area">
-        <h1 class="text title"><span>Docker 的容器内部署 Ceph 集群</span></h1>
+        <h1 class="text title"><span>Docker 容器内部署 Ceph 集群</span></h1>
         
       </div>
     </div>
@@ -149,7 +149,7 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line">ping centos-2</span><br><span class="line">ping centos-3</span><br><span class="line">ssh root@centos-2</span><br><span class="line"><span class="comment"># 若正常，则应输入 yes，成功进入后输入 exit 退出</span></span><br><span class="line">ssh root@centos-3</span><br><span class="line"><span class="comment"># 若正常，则应输入 yes，成功进入后输入 exit 退出</span></span><br></pre></td></tr></table></figure>
 
 <h4 id="部署-MON-与-MGR"><a href="#部署-MON-与-MGR" class="headerlink" title="部署 MON 与 MGR"></a>部署 MON 与 MGR</h4><p>接下来就是部署 Ceph 集群了，这里只需要在一个容器内执行即可。我选择在 <code>centos-1</code> 容器内执行。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 进入预先创建的 ceph-admin 目录</span></span><br><span class="line"><span class="built_in">cd</span> ~/ceph-admin</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化 Ceph 集群</span></span><br><span class="line">ceph-deploy new --cluster-network 192.168.102.0/24 --public-network 192.168.102.0/24 centos-1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建初始 Monitor 节点</span></span><br><span class="line">ceph-deploy mon create-initial</span><br><span class="line"><span class="comment"># 可能出现诸多异常</span></span><br><span class="line"><span class="comment"># 可参考本文的参考文档对照解决</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 将 admin 配置文件部署到所有节点</span></span><br><span class="line">ceph-deploy admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 另一个参考文档中使用了这句的参数，本人没有实验，一并输入了，不产生额外影响</span></span><br><span class="line">ceph-deploy --overwrite-conf admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 Manager 节点</span></span><br><span class="line">ceph-deploy mgr create centos-1</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-1 内</span></span><br><span class="line"><span class="comment"># 进入预先创建的 ceph-admin 目录</span></span><br><span class="line"><span class="built_in">cd</span> ~/ceph-admin</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化 Ceph 集群</span></span><br><span class="line">ceph-deploy new --cluster-network 192.168.102.0/24 --public-network 192.168.102.0/24 centos-1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建初始 Monitors 节点</span></span><br><span class="line">ceph-deploy mon create-initial</span><br><span class="line"><span class="comment"># 可能出现诸多异常</span></span><br><span class="line"><span class="comment"># 可参考本文的参考文档对照解决</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 将 admin 配置文件部署到所有节点</span></span><br><span class="line">ceph-deploy admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 另一个参考文档中使用了这句的参数，本人没有实验，一并输入了，不产生额外影响</span></span><br><span class="line">ceph-deploy --overwrite-conf admin centos-1 centos-2 centos-3</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 Managers 节点</span></span><br><span class="line">ceph-deploy mgr create centos-1</span><br></pre></td></tr></table></figure>
 
 <p>成功创建完 MON 节点与 MGR 节点后，就可以在另外两个容器中查看 Ceph 集群的状态了。</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在容器 centos-2/3 内</span></span><br><span class="line">ceph health</span><br><span class="line">ceph -s</span><br></pre></td></tr></table></figure>
